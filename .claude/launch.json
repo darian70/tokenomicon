@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "tokenomicon",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd '/Users/darian/Desktop/code credit gambler/tokenomicon' && npm run dev"],
+      "port": 3000,
+      "autoPort": false
+    }
+  ]
+}

@@ -1,0 +1,515 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CreditBucket {
+  purchased_compute
+  arena_credits
+  bonus_compute
+}
+
+enum LedgerEntryType {
+  purchase_credit
+  manual_grant
+  arena_entry
+  arena_reward
+  api_usage_debit
+  adjustment
+  daily_arena_grant
+  subscription_grant
+  signup_bonus
+  platform_rake
+  referral_bonus
+}
+
+enum GameType {
+  token_prophet
+  prompt_golf
+  bug_exorcist
+  context_chicken
+  rate_limit_roulette
+  benchmark_brawl
+  spot_deepfake
+  prompt_crash
+  token_mines
+}
+
+model UserProfile {
+  id               String           @id @default(cuid())
+  clerkUserId      String           @unique
+  email            String?
+  isAdmin          Boolean          @default(false)
+  xp               Int              @default(0)
+  rank             Int              @default(1)
+  totalGamesPlayed Int              @default(0)
+  totalGamesWon    Int              @default(0)
+  currentStreak    Int              @default(0)
+  bestStreak       Int              @default(0)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  apiKeys          ApiKey[]
+  ledgerEntries    CreditLedgerEntry[]
+  gameSessions     GameSession[]
+  gameAttempts     GameAttempt[]
+  providerUsage    ProviderUsage[]
+  achievements     Achievement[]
+  arenaStats       ArenaStats?
+  arenaDuelsAsA    ArenaDuel[]      @relation("ArenaDuelsAsPlayerA")
+  arenaDuelsAsB    ArenaDuel[]      @relation("ArenaDuelsAsPlayerB")
+  arenaDuelsWon    ArenaDuel[]      @relation("ArenaDuelsAsWinner")
+  subscription     UserSubscription?
+  matchmakingEntry MatchmakingEntry?
+  autoTopup        AutoTopupConfig?
+  budgetAlert      BudgetAlertConfig?
+  webhookEndpoints WebhookEndpoint[]
+  referralCode     ReferralCode?
+  referralsGiven   ReferralRedemption[] @relation("ReferralGiver")
+  referralUsed     ReferralRedemption?  @relation("ReferralRecipient")
+}
+
+model Achievement {
+  id         String      @id @default(cuid())
+  userId     String
+  code       String
+  unlockedAt DateTime    @default(now())
+  user       UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, code])
+  @@index([userId])
+}
+
+model CreditLedgerEntry {
+  id          String          @id @default(cuid())
+  userId      String
+  bucket      CreditBucket
+  type        LedgerEntryType
+  amount      Int
+  metadata    Json?
+  createdAt   DateTime        @default(now())
+  user        UserProfile     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, bucket, createdAt])
+  @@index([userId, createdAt])
+}
+
+model ApiKey {
+  id          String       @id @default(cuid())
+  userId      String
+  keyPrefix   String
+  keyHash     String
+  name        String
+  revokedAt   DateTime?
+  createdAt   DateTime     @default(now())
+  lastUsedAt  DateTime?
+  user        UserProfile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([keyPrefix])
+}
+
+model ProviderUsage {
+  id                String      @id @default(cuid())
+  userId            String
+  apiKeyId          String?
+  provider          String
+  model             String
+  requestId         String
+  promptTokens      Int
+  completionTokens  Int
+  totalTokens       Int
+  costInCredits     Int
+  metadata          Json?
+  createdAt         DateTime    @default(now())
+  user              UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([requestId])
+  @@index([userId, createdAt])
+  @@index([userId, apiKeyId, createdAt])
+}
+
+model StripeCheckoutSession {
+  id                    String    @id @default(cuid())
+  userId                String
+  stripeSessionId       String    @unique
+  stripePaymentIntentId String?
+  creditsPurchased      Int
+  amountCents           Int
+  fulfilledAt           DateTime?
+  createdAt             DateTime  @default(now())
+}
+
+model AdminCreditGrant {
+  id               String    @id @default(cuid())
+  adminUserId      String
+  targetUserId     String
+  bucket           CreditBucket
+  amount           Int
+  reason           String
+  createdAt        DateTime  @default(now())
+}
+
+model GameSession {
+  id              String      @id @default(cuid())
+  userId          String
+  game            GameType
+  challenge       Json
+  entryCost       Int
+  difficulty      String      @default("sandbox")
+  serverSeedHash  String?
+  clientSeed      String?
+  serverSeed      String?
+  nonce           BigInt?
+  expiresAt       DateTime?
+  submittedAt     DateTime?
+  settledAt       DateTime?
+  createdAt       DateTime    @default(now())
+  user            UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempt         GameAttempt?
+
+  @@index([userId, game, createdAt])
+  @@index([userId, settledAt])
+}
+
+model GameAttempt {
+  id            String      @id @default(cuid())
+  sessionId     String      @unique
+  userId        String
+  game          GameType
+  submission    Json
+  score         Int
+  rewardAmount  Int
+  metadata      Json?
+  createdAt     DateTime    @default(now())
+  session       GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user          UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, game, createdAt])
+}
+
+// ============================================================================
+// Subscriptions
+// ============================================================================
+
+model UserSubscription {
+  id                   String      @id @default(cuid())
+  userId               String      @unique
+  stripeCustomerId     String?
+  stripeSubscriptionId String?     @unique
+  tier                 String
+  status               String      @default("active")
+  monthlyCredits       Int
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  user                 UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([stripeSubscriptionId])
+  @@index([stripeCustomerId])
+  @@index([status])
+}
+
+// ============================================================================
+// Arena PvP Models
+// ============================================================================
+
+model ArenaStats {
+  id               String      @id @default(cuid())
+  userId           String      @unique
+  rating           Int         @default(1500)
+  totalGames       Int         @default(0)
+  wins             Int         @default(0)
+  draws            Int         @default(0)
+  losses           Int         @default(0)
+  totalCreditsWon  Int         @default(0)
+  totalCreditsLost Int         @default(0)
+  currentStreak    Int         @default(0)
+  bestStreak       Int         @default(0)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  user             UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([rating])
+  @@index([totalGames])
+}
+
+enum ArenaDuelStatus {
+  waiting
+  active
+  completed
+  abandoned
+}
+
+model ArenaDuel {
+  id            String          @id @default(cuid())
+  playerAId     String
+  playerBId     String
+  entryAmount   Int
+  model         String
+  maxTokens     Int
+  status        ArenaDuelStatus @default(waiting)
+  startedAt     DateTime?
+  endedAt       DateTime?
+  winnerId      String?
+  endedReason   String?
+  platformRake  Int?
+  winnerPrize   Int?
+  // DB-side state (replaces in-memory Map)
+  tokensA       Int             @default(0)
+  tokensB       Int             @default(0)
+  connectedA    Boolean         @default(false)
+  connectedB    Boolean         @default(false)
+  messagesA     Json            @default("[]")
+  messagesB     Json            @default("[]")
+  createdAt     DateTime        @default(now())
+  playerA       UserProfile     @relation("ArenaDuelsAsPlayerA", fields: [playerAId], references: [id], onDelete: Cascade)
+  playerB       UserProfile     @relation("ArenaDuelsAsPlayerB", fields: [playerBId], references: [id], onDelete: Cascade)
+  winner        UserProfile?    @relation("ArenaDuelsAsWinner", fields: [winnerId], references: [id], onDelete: SetNull)
+
+  @@index([playerAId, status])
+  @@index([playerBId, status])
+  @@index([winnerId])
+  @@index([createdAt])
+}
+
+// DB-backed matchmaking queue (replaces in-memory playerQueue array)
+model MatchmakingEntry {
+  id          String      @id @default(cuid())
+  userId      String      @unique
+  entryAmount Int
+  rating      Int
+  expiresAt   DateTime
+  createdAt   DateTime    @default(now())
+  user        UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([entryAmount, expiresAt])
+}
+
+// Dead-letter queue for streaming credit adjustments that failed to commit
+model FailedAdjustment {
+  id         String    @id @default(cuid())
+  userId     String
+  amount     Int       // positive = owed to user (refund), negative = owed to platform
+  reason     String
+  metadata   Json?
+  attempts   Int       @default(0)
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([resolvedAt, createdAt])
+}
+
+// DB-backed rate limiting — works across serverless instances
+model RateLimitBucket {
+  key       String   @id
+  count     Int      @default(0)
+  windowEnd DateTime
+
+  @@index([windowEnd])
+}
+
+// ============================================================================
+// Auto-Topup
+// ============================================================================
+
+// Stores a user's saved payment method and threshold config for automatic
+// credit top-ups. Created via Stripe Checkout setup mode.
+model AutoTopupConfig {
+  id                    String      @id @default(cuid())
+  userId                String      @unique
+  stripeCustomerId      String
+  stripePaymentMethodId String
+  thresholdCredits      Int         @default(500)
+  topupPackId           String      @default("starter")
+  enabled               Boolean     @default(true)
+  lastTopupAt           DateTime?
+  lastFailedAt          DateTime?
+  failureReason         String?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  user                  UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([enabled, lastTopupAt])
+}
+
+// ============================================================================
+// Budget Alerts
+// ============================================================================
+
+// Sends an email when compute credits drop below a configured threshold.
+// Debounced per-day to avoid spam.
+model BudgetAlertConfig {
+  id               String      @id @default(cuid())
+  userId           String      @unique
+  email            String
+  thresholdCredits Int         @default(1000)
+  enabled          Boolean     @default(true)
+  lastAlertAt      DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  user             UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([enabled])
+}
+
+// ============================================================================
+// Webhooks
+// ============================================================================
+
+// A user-registered HTTPS endpoint that receives signed event payloads.
+model WebhookEndpoint {
+  id          String            @id @default(cuid())
+  userId      String
+  url         String
+  secret      String            // HMAC-SHA256 signing key (hex, 32 bytes)
+  events      String[]          // e.g. ["credit.low","game.result"]
+  enabled     Boolean           @default(true)
+  description String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  user        UserProfile       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries  WebhookDelivery[]
+
+  @@index([userId])
+}
+
+// Immutable record of every delivery attempt.
+model WebhookDelivery {
+  id           String          @id @default(cuid())
+  endpointId   String
+  event        String
+  payload      Json
+  statusCode   Int?
+  success      Boolean
+  error        String?
+  durationMs   Int
+  createdAt    DateTime        @default(now())
+  endpoint     WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([endpointId, createdAt])
+}
+
+// ============================================================================
+// Referrals
+// ============================================================================
+
+// One code per user. Redeemers get bonus arena credits; referrer gets bonus
+// compute credits when their referee completes a first purchase.
+model ReferralCode {
+  id          String               @id @default(cuid())
+  userId      String               @unique
+  code        String               @unique  // e.g. "DARIAN-X7K2"
+  createdAt   DateTime             @default(now())
+  user        UserProfile          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  redemptions ReferralRedemption[]
+
+  @@index([code])
+}
+
+model ReferralRedemption {
+  id           String       @id @default(cuid())
+  codeId       String
+  giverId      String       // the referrer
+  recipientId  String       @unique  // one redemption per new user
+  bonusPaid    Boolean      @default(false)  // true after recipient's first purchase
+  createdAt    DateTime     @default(now())
+  code         ReferralCode @relation(fields: [codeId], references: [id])
+  giver        UserProfile  @relation("ReferralGiver", fields: [giverId], references: [id])
+  recipient    UserProfile  @relation("ReferralRecipient", fields: [recipientId], references: [id])
+
+  @@index([codeId])
+  @@index([giverId])
+}
+
+// ============================================================================
+// Game Round Oracle — live-inference cache + pool for skill games
+// ============================================================================
+
+// Cache of computed ground truth, keyed by game + content hash. Allows
+// deterministic deduplication: identical challenges share the same cached
+// answer regardless of which user requested it first.
+model OracleCacheEntry {
+  id              String   @id @default(cuid())
+  game            GameType
+  cacheKey        String   // SHA-256 of canonical(challenge)
+  challenge       Json
+  groundTruth     Json
+  oracleCostUsd   Float    @default(0)   // sum of provider $ spent computing this entry
+  providerCalls   Json     @default("[]") // [{provider, model, promptTokens, completionTokens, latencyMs, requestId}]
+  hits            Int      @default(0)   // times this cache entry was served
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+
+  @@unique([game, cacheKey])
+  @@index([game, expiresAt])
+}
+
+// Pre-warmed rounds ready to deal at play-time. Background pre-warmer keeps
+// N entries per game-tier so users never wait on a live provider call.
+model OraclePoolEntry {
+  id          String   @id @default(cuid())
+  game        GameType
+  tier        String   // 'sandbox' | 'production' | 'blackbox'
+  cacheKey    String   // points at OracleCacheEntry.cacheKey
+  challenge   Json     // duplicated for fast read (no join)
+  groundTruth Json
+  reservedAt  DateTime?
+  servedAt    DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([game, tier, servedAt, reservedAt])
+  @@index([createdAt])
+}
+
+// Per-call audit log of every oracle invocation, for cost reconciliation
+// and admin dashboard. Truncated by retention policy.
+model OracleCallLog {
+  id              String   @id @default(cuid())
+  game            GameType
+  tier            String
+  outcome         String   // 'pool_hit' | 'cache_hit' | 'live_compute' | 'error'
+  oracleCostUsd   Float    @default(0)
+  providerCalls   Int      @default(0)
+  durationMs      Int      @default(0)
+  cacheKey        String?
+  error           String?
+  createdAt       DateTime @default(now())
+
+  @@index([game, createdAt])
+  @@index([outcome, createdAt])
+}
+
+// ============================================================================
+// Semantic Cache — API proxy cost optimization
+// ============================================================================
+
+// Stores prompt embeddings for near-duplicate detection.
+// Flow: embed user prompt → cosine similarity lookup → if > 0.97, return
+// cached response. Saves provider cost for repetitive workloads (AI apps
+// that call the same prompts across users).
+//
+// Similarity search is O(n) over active entries per model. Scales to ~10K
+// entries without issue; upgrade to pgvector at 100K+.
+model SemanticCacheEntry {
+  id               String   @id @default(cuid())
+  model            String   // resolved model ID (e.g. "gpt-4o-mini")
+  promptHash       String   // SHA-256 of prompt text — fast exact-match path
+  promptText       String   @db.Text
+  embedding        Json     // float32[] stored as JSON — 1536 dims for text-embedding-3-small
+  responseText     String   @db.Text
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  cacheHits        Int      @default(0)
+  savedCreditsTotal Int     @default(0)  // running tally of credits saved via this entry
+  createdAt        DateTime @default(now())
+  expiresAt        DateTime
+
+  @@unique([model, promptHash])  // exact-match fast path
+  @@index([model, expiresAt])    // for active entry scans
+  @@index([createdAt])
+}

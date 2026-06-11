@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Allow: /docs
+Allow: /help
+Allow: /terms
+Allow: /privacy
+
+Disallow: /arena
+Disallow: /profile
+Disallow: /playground
+Disallow: /admin
+Disallow: /api/
+
+Sitemap: https://tokenomicon.io/sitemap.xml

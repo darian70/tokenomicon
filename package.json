@@ -4,14 +4,31 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:stripe": "stripe listen --forward-to localhost:3000/api/billing/webhook",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "db:generate": "prisma generate",
+    "stripe:prices": "stripe prices list --limit 20"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.2.7",
+    "@prisma/client": "^6.18.0",
     "next": "16.2.4",
+    "prisma": "^6.18.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "resend": "^6.12.3",
+    "stripe": "^22.1.0",
+    "zod": "^4.3.6",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -20,7 +37,9 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "stripe-cli": "^0.1.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.6"
   }
 }
