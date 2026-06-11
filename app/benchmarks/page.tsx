@@ -11,7 +11,10 @@
 import { db } from '@/lib/server/db'
 import { GameType } from '@prisma/client'
 
-export const revalidate = 60
+// Force dynamic rendering — the page queries live DB data and must not be
+// prerendered at build time (tables may not exist yet on first deploy).
+// Migrate to 'use cache' + cacheLife('minutes') when cacheComponents is enabled.
+export const dynamic = 'force-dynamic'
 
 // ---------------------------------------------------------------------------
 // Data fetching — all server-side, no client JS required
@@ -42,6 +45,7 @@ interface OracleStats {
 }
 
 async function getModelSpeedLeaderboard(): Promise<ModelSpeedEntry[]> {
+  try {
   // Pull Rate Roulette cache entries from the last 7 days
   const entries = await db.oracleCacheEntry.findMany({
     where: {
@@ -95,9 +99,11 @@ async function getModelSpeedLeaderboard(): Promise<ModelSpeedEntry[]> {
   }
 
   return result.sort((a, b) => a.medianMs - b.medianMs)
+  } catch { return [] }
 }
 
 async function getModelQualityRankings(): Promise<ModelQualityEntry[]> {
+  try {
   const entries = await db.oracleCacheEntry.findMany({
     where: {
       game: GameType.benchmark_brawl,
@@ -131,9 +137,12 @@ async function getModelQualityRankings(): Promise<ModelQualityEntry[]> {
     }))
     .sort((a, b) => b.winRate - a.winRate)
     .slice(0, 10)
+  } catch { return [] }
 }
 
 async function getOracleStats(): Promise<OracleStats> {
+  const zero: OracleStats = { totalRoundsToday: 0, poolHitRate: 0, cacheHitRate: 0, liveComputeRate: 0, totalCostUsdToday: 0 }
+  try {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
 
   const [byOutcome, costRow] = await Promise.all([
@@ -162,6 +171,7 @@ async function getOracleStats(): Promise<OracleStats> {
     liveComputeRate: total > 0 ? Math.round(((counts.live_compute ?? 0) / total) * 100) : 0,
     totalCostUsdToday: costRow._sum.oracleCostUsd ?? 0,
   }
+  } catch { return zero }
 }
 
 // ---------------------------------------------------------------------------
