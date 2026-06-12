@@ -1,0 +1,21 @@
+name: Feature Request
+description: Suggest a new game, API feature, or improvement
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [New Game, API Proxy, Billing, Benchmark Data, Developer Experience, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem this solves
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution

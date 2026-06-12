@@ -1,0 +1,25 @@
+name: Bug Report
+description: Something is broken
+labels: ["bug"]
+body:
+  - type: input
+    id: url
+    attributes:
+      label: URL
+      placeholder: https://tokenomicon.vercel.app/arena
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      placeholder: Describe the bug
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [Games, API Proxy, Billing, Auth, Benchmarks, Other]
