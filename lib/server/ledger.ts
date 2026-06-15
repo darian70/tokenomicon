@@ -7,6 +7,13 @@ export const DAILY_ARENA_GRANT = ECONOMY.DAILY_ARENA_GRANT
 
 type LedgerTx = Prisma.TransactionClient
 
+// Column name in CreditBalance that corresponds to each CreditBucket.
+const BUCKET_COLUMN: Record<CreditBucket, 'purchasedCompute' | 'arenaCredits' | 'bonusCompute'> = {
+  purchased_compute: 'purchasedCompute',
+  arena_credits: 'arenaCredits',
+  bonus_compute: 'bonusCompute',
+}
+
 export async function addLedgerEntry(input: {
   tx?: LedgerTx
   userId: string
@@ -16,36 +23,43 @@ export async function addLedgerEntry(input: {
   metadata?: Prisma.InputJsonValue
 }) {
   const client = input.tx ?? db
-  return client.creditLedgerEntry.create({
-    data: {
-      userId: input.userId,
-      bucket: input.bucket,
-      type: input.type,
-      amount: input.amount,
-      metadata: input.metadata,
-    },
-  })
+  const col = BUCKET_COLUMN[input.bucket]
+
+  // Write the immutable ledger row and update the running snapshot atomically.
+  const [entry] = await Promise.all([
+    client.creditLedgerEntry.create({
+      data: {
+        userId: input.userId,
+        bucket: input.bucket,
+        type: input.type,
+        amount: input.amount,
+        metadata: input.metadata,
+      },
+    }),
+    client.creditBalance.upsert({
+      where: { userId: input.userId },
+      create: {
+        userId: input.userId,
+        [col]: input.amount,
+      },
+      update: {
+        [col]: { increment: input.amount },
+      },
+    }),
+  ])
+
+  return entry
 }
 
 export async function getBalances(userId: string, tx?: LedgerTx) {
   const client = tx ?? db
-  const grouped = await client.creditLedgerEntry.groupBy({
-    by: ['bucket'],
-    where: { userId },
-    _sum: { amount: true },
-  })
+  const snapshot = await client.creditBalance.findUnique({ where: { userId } })
 
-  const balances: Record<CreditBucket, number> = {
-    purchased_compute: 0,
-    arena_credits: 0,
-    bonus_compute: 0,
+  return {
+    purchased_compute: snapshot?.purchasedCompute ?? 0,
+    arena_credits: snapshot?.arenaCredits ?? 0,
+    bonus_compute: snapshot?.bonusCompute ?? 0,
   }
-
-  for (const row of grouped) {
-    balances[row.bucket] = row._sum.amount ?? 0
-  }
-
-  return balances
 }
 
 // Returns the subscription tier for a user, or null if none / not active.

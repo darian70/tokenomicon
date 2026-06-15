@@ -485,6 +485,21 @@ model OracleCallLog {
 }
 
 // ============================================================================
+// Credit Balance Snapshot — running totals updated with every ledger entry
+// ============================================================================
+
+// Maintained by addLedgerEntry() inside the same transaction as every credit
+// change. getBalances() reads this instead of doing a full groupBy scan.
+// Single row per user, one column per bucket using an upsert pattern.
+model CreditBalance {
+  userId           String @id
+  purchasedCompute Int    @default(0)
+  arenaCredits     Int    @default(0)
+  bonusCompute     Int    @default(0)
+  updatedAt        DateTime @updatedAt
+}
+
+// ============================================================================
 // Daily Grant Deduplication — unique constraint prevents double-grants
 // ============================================================================
 
