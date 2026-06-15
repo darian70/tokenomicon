@@ -1977,12 +1977,17 @@ const CLIENT_HIDDEN_FIELDS: Partial<Record<GameType, string[]>> = {
   spot_deepfake: ['fakePosition', 'fakeIdx', 'explanation'],
 }
 
+// Fields written by the oracle pipeline that must never reach the browser
+// regardless of game type.
+const ORACLE_INTERNAL_FIELDS = ['oracleCacheKey'] as const
+
 export function sanitizeChallengeForClient(
   game: GameType,
   challenge: Record<string, unknown>,
 ): Record<string, unknown> {
   const clone: Record<string, unknown> = { ...challenge }
   for (const field of CLIENT_HIDDEN_FIELDS[game] ?? []) delete clone[field]
+  for (const field of ORACLE_INTERNAL_FIELDS) delete clone[field]
 
   // Spot the AI: each snippet is tagged with isAI (the answer) and each image
   // with isFake. The play UI only needs the text/position, so strip the answer

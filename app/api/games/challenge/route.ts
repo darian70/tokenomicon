@@ -37,6 +37,7 @@ export async function POST(req: Request) {
 
     let challenge = session.challenge as Record<string, unknown>
     let enriched = false
+    let oracleSource: string | undefined
 
     // Oracle path (preferred when registered): replaces the static generator
     // output with a cached/pooled live-inference round. Falls back to the
@@ -55,14 +56,15 @@ export async function POST(req: Request) {
             nonce: Number(session.nonce ?? 0),
           },
         )
+        oracleSource = dealt.source
         // Merge the oracle's challenge + ground-truth fields into the session
         // challenge. sanitizeChallengeForClient strips answer fields before
-        // the response leaves the server.
+        // the response leaves the server. oracleCacheKey stays in the persisted
+        // blob for submit-time ground-truth lookup but is stripped client-side.
         challenge = {
           ...challenge,
           ...dealt.challenge,
           ...dealt.groundTruth,
-          oracleSource: dealt.source,
           oracleCacheKey: dealt.cacheKey,
         }
         enriched = true
@@ -103,6 +105,7 @@ export async function POST(req: Request) {
       tier: session.difficulty,
       serverSeedHash: session.serverSeedHash,
       expiresAt: session.expiresAt?.toISOString() ?? null,
+      oracleSource,
     })
   } catch (error) {
     const { message, status } = toApiResponse(error)
