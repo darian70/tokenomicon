@@ -30,6 +30,12 @@ export async function requireUserProfile() {
 
 export async function requireAdminProfile() {
   const profile = await requireUserProfile()
-  if (!profile.isAdmin) throw new Error('Forbidden')
+  // Two-factor admin check: DB flag (refreshed each call) AND live env-var lookup.
+  // Prevents privilege escalation if someone manually sets isAdmin=true in the DB
+  // while their email is not in TOKENOMICON_ADMIN_EMAILS.
+  const email = profile.email?.toLowerCase()
+  if (!profile.isAdmin || !(email && adminEmailSet().has(email))) {
+    throw new Error('Forbidden')
+  }
   return profile
 }
