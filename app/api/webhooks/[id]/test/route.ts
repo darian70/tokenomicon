@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireUserProfile } from '@/lib/server/auth'
 import { db } from '@/lib/server/db'
 import { fireWebhook } from '@/lib/server/webhooks'
+import { validateWebhookUrl, SsrfBlockedError } from '@/lib/server/webhook-url-validator'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -46,6 +47,13 @@ export async function POST(_req: Request, ctx: RouteContext) {
     const signature = createHmac('sha256', endpointRecord.secret)
       .update(`${timestamp}.${body}`)
       .digest('hex')
+
+    try {
+      await validateWebhookUrl(endpointRecord.url)
+    } catch (e) {
+      const msg = e instanceof SsrfBlockedError ? e.message : 'Invalid endpoint URL'
+      return NextResponse.json({ success: false, error: msg }, { status: 422 })
+    }
 
     let statusCode: number | undefined
     let success = false

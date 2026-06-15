@@ -16,6 +16,7 @@
 
 import crypto from 'crypto'
 import { db } from '@/lib/server/db'
+import { validateWebhookUrl, SsrfBlockedError } from '@/lib/server/webhook-url-validator'
 
 // ---------------------------------------------------------------------------
 // Event catalogue
@@ -71,6 +72,18 @@ async function deliverToEndpoint(
   let statusCode: number | undefined
   let success = false
   let error: string | undefined
+
+  try {
+    await validateWebhookUrl(url)
+  } catch (e) {
+    error = e instanceof SsrfBlockedError ? e.message : 'Invalid endpoint URL'
+    db.webhookDelivery
+      .create({
+        data: { endpointId, event, payload: payload as object, statusCode: undefined, success: false, error, durationMs: 0 },
+      })
+      .catch(() => {})
+    return
+  }
 
   try {
     const res = await fetch(url, {
