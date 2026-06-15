@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { GAME_CATALOG } from '@/lib/game-catalog'
 import HotGameBadge from '@/components/fx/HotGameBadge'
 import LiveWinTicker from '@/components/fx/LiveWinTicker'
@@ -17,8 +18,14 @@ const DIFFICULTY_COLORS = {
 }
 
 export default function GamesPage() {
+  const searchParams = useSearchParams()
   const [category, setCategory] = useState<FilterCategory>('all')
   const [difficulty, setDifficulty] = useState<FilterDifficulty>('all')
+  const [showWelcome, setShowWelcome] = useState(false)
+
+  useEffect(() => {
+    if (searchParams.get('welcome') === '1') setShowWelcome(true)
+  }, [searchParams])
 
   const filtered = GAME_CATALOG.filter((g) => {
     if (category !== 'all' && g.category !== category) return false
@@ -37,6 +44,24 @@ export default function GamesPage() {
           </p>
         </div>
       </div>
+
+      {showWelcome && (
+        <div className="mx-6 mt-4 rounded-lg border border-[#59f5a9]/30 bg-[#59f5a9]/05 px-4 py-3 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-display font-bold text-[#59f5a9] tracking-widest">WELCOME TO TOKENOMICON</p>
+            <p className="text-xs font-mono text-[#4a5a6d] mt-0.5">
+              You have been credited with {100} free arena credits. Pick a game and start playing — credits refresh daily.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowWelcome(false)}
+            className="text-[#4a5a6d] hover:text-white transition-colors text-lg leading-none shrink-0 mt-0.5"
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Live win ticker */}
       <LiveWinTicker />

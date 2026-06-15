@@ -8,7 +8,7 @@ export default function SignUpPage() {
           <h1 className="font-display text-3xl font-black tracking-[0.16em] text-blood">TOKENOMICON</h1>
           <p className="font-vt text-cyan/75 tracking-widest text-sm mt-1">COMPUTE ARCADE</p>
         </div>
-        <SignUp />
+        <SignUp forceRedirectUrl="/games?welcome=1" />
       </div>
     </div>
   )
