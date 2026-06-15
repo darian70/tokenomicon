@@ -7,6 +7,16 @@ export interface ResponsibleGamingCheck {
   cooldownEndsAt?: Date
 }
 
+const MAX_DAILY_SESSIONS = 50
+
+// Self-exclusion durations available to users (in days).
+export const SELF_EXCLUSION_OPTIONS = [
+  { label: '24 hours', days: 1 },
+  { label: '7 days', days: 7 },
+  { label: '30 days', days: 30 },
+  { label: '6 months', days: 180 },
+] as const
+
 export async function checkResponsibleGaming(userId: string): Promise<ResponsibleGamingCheck> {
   const now = new Date()
   const dayStart = new Date(now)
@@ -14,7 +24,11 @@ export async function checkResponsibleGaming(userId: string): Promise<Responsibl
 
   const windowStart = new Date(now.getTime() - ECONOMY.SESSION_WINDOW_SECONDS * 1000)
 
-  const [dailySessions, recentSessions] = await Promise.all([
+  const [profile, dailySessions, recentSessions] = await Promise.all([
+    db.userProfile.findUnique({
+      where: { id: userId },
+      select: { selfExcludedUntil: true },
+    }),
     db.gameSession.count({
       where: { userId, createdAt: { gte: dayStart } },
     }),
@@ -22,6 +36,14 @@ export async function checkResponsibleGaming(userId: string): Promise<Responsibl
       where: { userId, createdAt: { gte: windowStart } },
     }),
   ])
+
+  if (profile?.selfExcludedUntil && profile.selfExcludedUntil > now) {
+    return {
+      allowed: false,
+      reason: 'You have self-excluded from play. This helps you stay in control.',
+      cooldownEndsAt: profile.selfExcludedUntil,
+    }
+  }
 
   if (recentSessions >= ECONOMY.MAX_ACTIVE_SESSIONS_PER_WINDOW) {
     const cooldownEndsAt = new Date(now.getTime() + ECONOMY.SESSION_WINDOW_SECONDS * 1000)
@@ -32,7 +54,6 @@ export async function checkResponsibleGaming(userId: string): Promise<Responsibl
     }
   }
 
-  const MAX_DAILY_SESSIONS = 50
   if (dailySessions >= MAX_DAILY_SESSIONS) {
     return {
       allowed: false,
@@ -41,6 +62,26 @@ export async function checkResponsibleGaming(userId: string): Promise<Responsibl
   }
 
   return { allowed: true }
+}
+
+export async function selfExclude(userId: string, days: number): Promise<Date> {
+  const until = new Date(Date.now() + days * 24 * 60 * 60 * 1000)
+  await db.userProfile.update({
+    where: { id: userId },
+    data: { selfExcludedUntil: until },
+  })
+  return until
+}
+
+export async function getSelfExclusionStatus(
+  userId: string,
+): Promise<{ excluded: boolean; until: Date | null }> {
+  const profile = await db.userProfile.findUnique({
+    where: { id: userId },
+    select: { selfExcludedUntil: true },
+  })
+  const until = profile?.selfExcludedUntil ?? null
+  return { excluded: until !== null && until > new Date(), until }
 }
 
 export function getResponsibleGamingNotice(): string {

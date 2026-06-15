@@ -41,18 +41,19 @@ enum GameType {
 }
 
 model UserProfile {
-  id               String           @id @default(cuid())
-  clerkUserId      String           @unique
-  email            String?
-  isAdmin          Boolean          @default(false)
-  xp               Int              @default(0)
-  rank             Int              @default(1)
-  totalGamesPlayed Int              @default(0)
-  totalGamesWon    Int              @default(0)
-  currentStreak    Int              @default(0)
-  bestStreak       Int              @default(0)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  id                String           @id @default(cuid())
+  clerkUserId       String           @unique
+  email             String?
+  isAdmin           Boolean          @default(false)
+  xp                Int              @default(0)
+  rank              Int              @default(1)
+  totalGamesPlayed  Int              @default(0)
+  totalGamesWon     Int              @default(0)
+  currentStreak     Int              @default(0)
+  bestStreak        Int              @default(0)
+  selfExcludedUntil DateTime?        // null = not excluded; set by user via responsible gaming UI
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
   apiKeys          ApiKey[]
   ledgerEntries    CreditLedgerEntry[]
   gameSessions     GameSession[]
