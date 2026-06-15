@@ -2,8 +2,8 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { GAME_CATALOG } from '@/lib/game-catalog'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { GAME_CATALOG, type GameCatalogEntry } from '@/lib/game-catalog'
 import HotGameBadge from '@/components/fx/HotGameBadge'
 import LiveWinTicker from '@/components/fx/LiveWinTicker'
 import DailyChallenge from '@/components/games/DailyChallenge'
@@ -19,13 +19,22 @@ const DIFFICULTY_COLORS = {
 
 export default function GamesPage() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [category, setCategory] = useState<FilterCategory>('all')
   const [difficulty, setDifficulty] = useState<FilterDifficulty>('all')
   const [showWelcome, setShowWelcome] = useState(false)
+  const [chanceModalGame, setChanceModalGame] = useState<GameCatalogEntry | null>(null)
 
   useEffect(() => {
     if (searchParams.get('welcome') === '1') setShowWelcome(true)
   }, [searchParams])
+
+  function handleGameClick(e: React.MouseEvent, game: GameCatalogEntry) {
+    if (game.isChanceGame) {
+      e.preventDefault()
+      setChanceModalGame(game)
+    }
+  }
 
   const filtered = GAME_CATALOG.filter((g) => {
     if (category !== 'all' && g.category !== category) return false
@@ -60,6 +69,47 @@ export default function GamesPage() {
           >
             ×
           </button>
+        </div>
+      )}
+
+      {/* Chance game disclosure modal */}
+      {chanceModalGame && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+          onClick={() => setChanceModalGame(null)}
+        >
+          <div
+            className="relative bg-[#0d1520] border border-[#ffd700]/30 rounded-2xl p-6 max-w-md w-full shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold tracking-widest border border-[#ffd700]/40 text-[#ffd700] bg-[#ffd700]/08">
+                CHANCE GAME
+              </span>
+            </div>
+            <h2 className="font-display text-lg font-black text-white tracking-wider mb-2">
+              {chanceModalGame.name}
+            </h2>
+            <div className="text-xs font-mono text-[#4a5a6d] space-y-2 mb-6">
+              <p>This game is based on <span className="text-[#ffd700]">luck and chance</span>, not skill. Outcomes are determined by a provably-fair RNG committed before the round starts — no prediction strategy improves your odds.</p>
+              <p>Payouts are in <span className="text-[#a78bfa]">bonus compute</span> only — non-cashable API credits that apply against your usage. No purchase is required to play.</p>
+              <p className="text-[#2a3a50]">You can independently verify any outcome at <a href="/verify" className="text-[#5ad8ff] hover:text-white transition-colors">/verify</a> after the round.</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setChanceModalGame(null)}
+                className="flex-1 py-2.5 rounded-lg border border-[#192433] text-xs font-mono text-[#4a5a6d] hover:text-white hover:border-[#2a3a50] transition-colors"
+              >
+                Go back
+              </button>
+              <button
+                onClick={() => { setChanceModalGame(null); router.push(`/games/${chanceModalGame.slug}`) }}
+                className="flex-1 py-2.5 rounded-lg border border-[#ffd700]/30 bg-[#ffd700]/08 text-xs font-mono font-bold text-[#ffd700] hover:bg-[#ffd700]/15 transition-colors"
+              >
+                I understand — play
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -119,6 +169,7 @@ export default function GamesPage() {
               <Link
                 key={game.id}
                 href={`/games/${game.slug}`}
+                onClick={(e) => handleGameClick(e, game)}
                 className="group block rounded-xl border bg-[#0c111a] overflow-hidden cursor-pointer game-card-hover"
                 style={{ borderColor: game.accentBorder, '--glow-color': game.accent } as React.CSSProperties}
               >
@@ -128,9 +179,16 @@ export default function GamesPage() {
                 <div className="p-5">
                   {/* Game ID / type */}
                   <div className="flex items-center justify-between mb-4 gap-2">
-                    <p className="text-[10px] font-mono tracking-widest uppercase" style={{ color: game.accent }}>
-                      {game.category}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-[10px] font-mono tracking-widest uppercase" style={{ color: game.accent }}>
+                        {game.category}
+                      </p>
+                      {game.isChanceGame && (
+                        <span className="text-[8px] font-mono px-1.5 py-0.5 rounded border border-[#ffd700]/30 text-[#ffd700] bg-[#ffd700]/06">
+                          CHANCE
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-1.5">
                       <HotGameBadge gameId={game.id} />
                       <span
