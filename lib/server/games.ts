@@ -2149,14 +2149,28 @@ export async function submitGameSession(input: {
     if (session.expiresAt && new Date() > session.expiresAt) {
       const refundAmount = Math.floor(session.entryCost * ECONOMY.EXPIRED_SESSION_REFUND_RATIO)
       if (refundAmount > 0) {
-        await addLedgerEntry({
-          tx,
-          userId: input.userId,
-          bucket: 'arena_credits',
-          type: 'adjustment',
-          amount: refundAmount,
-          metadata: { reason: 'session_expired_refund', sessionId: session.id },
+        // Cap total expiry refunds at MAX_DAILY_EXPIRY_REFUNDS per day to prevent
+        // any cycle-and-expire farming pattern combined with future bugs.
+        const dayStart = new Date()
+        dayStart.setUTCHours(0, 0, 0, 0)
+        const todayRefunds = await tx.creditLedgerEntry.count({
+          where: {
+            userId: input.userId,
+            type: 'adjustment',
+            metadata: { path: ['reason'], equals: 'session_expired_refund' },
+            createdAt: { gte: dayStart },
+          },
         })
+        if (todayRefunds < ECONOMY.MAX_DAILY_EXPIRY_REFUNDS) {
+          await addLedgerEntry({
+            tx,
+            userId: input.userId,
+            bucket: 'arena_credits',
+            type: 'adjustment',
+            amount: refundAmount,
+            metadata: { reason: 'session_expired_refund', sessionId: session.id },
+          })
+        }
       }
       await tx.gameSession.update({
         where: { id: session.id },

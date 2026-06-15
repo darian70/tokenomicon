@@ -20,6 +20,9 @@ export const ECONOMY = {
   MAX_ACTIVE_SESSIONS_PER_WINDOW: 3,
   SESSION_WINDOW_SECONDS: 300,
   EXPIRED_SESSION_REFUND_RATIO: 0.5,
+  // Max times a user can receive an expiry refund per day. Defensive cap against
+  // any cycle-and-expire pattern. Matches the per-window session limit × 4.
+  MAX_DAILY_EXPIRY_REFUNDS: 12,
 } as const
 
 // Daily arena grant multipliers per subscription tier.
