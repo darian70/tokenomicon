@@ -59,30 +59,29 @@ async function getActiveSubscriptionTier(userId: string): Promise<string | null>
 }
 
 export async function ensureDailyArenaCredits(userId: string) {
-  const now = new Date()
-  const start = new Date(now)
-  start.setHours(0, 0, 0, 0)
+  const today = new Date().toISOString().slice(0, 10) // 'YYYY-MM-DD' UTC
 
-  const existing = await db.creditLedgerEntry.findFirst({
-    where: {
-      userId,
-      type: 'daily_arena_grant',
-      createdAt: { gte: start },
-    },
-  })
+  const tier = await getActiveSubscriptionTier(userId)
+  const multiplier = tier ? (SUBSCRIPTION_DAILY_GRANT_MULTIPLIER[tier] ?? 1) : 1
+  const grantAmount = ECONOMY.DAILY_ARENA_GRANT * multiplier
 
-  if (!existing) {
-    const tier = await getActiveSubscriptionTier(userId)
-    const multiplier = tier ? (SUBSCRIPTION_DAILY_GRANT_MULTIPLIER[tier] ?? 1) : 1
-    const grantAmount = ECONOMY.DAILY_ARENA_GRANT * multiplier
-
-    await addLedgerEntry({
-      userId,
-      bucket: 'arena_credits',
-      type: 'daily_arena_grant',
-      amount: grantAmount,
-      metadata: { source: 'daily_login', subscriptionTier: tier ?? 'none', multiplier },
+  try {
+    await db.$transaction(async (tx) => {
+      // Unique constraint on (userId, date) makes this idempotent: a second
+      // concurrent call for the same day gets P2002 and the catch below ignores it.
+      await tx.dailyGrantRecord.create({ data: { userId, date: today, amount: grantAmount } })
+      await addLedgerEntry({
+        tx,
+        userId,
+        bucket: 'arena_credits',
+        type: 'daily_arena_grant',
+        amount: grantAmount,
+        metadata: { source: 'daily_login', subscriptionTier: tier ?? 'none', multiplier },
+      })
     })
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') return
+    throw e
   }
 }
 

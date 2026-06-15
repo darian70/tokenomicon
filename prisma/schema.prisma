@@ -485,6 +485,24 @@ model OracleCallLog {
 }
 
 // ============================================================================
+// Daily Grant Deduplication — unique constraint prevents double-grants
+// ============================================================================
+
+// One row per user per calendar day. Created atomically with the ledger entry
+// inside a transaction so a unique constraint violation is the only signal
+// needed to detect a duplicate grant attempt.
+model DailyGrantRecord {
+  id        String   @id @default(cuid())
+  userId    String
+  date      String   // 'YYYY-MM-DD' UTC
+  amount    Int
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+// ============================================================================
 // Semantic Cache — API proxy cost optimization
 // ============================================================================
 
