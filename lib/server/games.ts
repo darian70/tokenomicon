@@ -4,6 +4,7 @@ import { db } from '@/lib/server/db'
 import { addLedgerEntry } from '@/lib/server/ledger'
 import { createFairnessProof, fairRandom } from '@/lib/server/fairness'
 import { type DifficultyTier, TIER_CONFIGS, ECONOMY, TIER_SUBSCRIPTION_REQUIREMENT, calculateReward, getFlavorMessage, isChanceGame, chanceGamesEnabled } from '@/lib/server/economy'
+import { computeStreak } from '@/lib/server/streak'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -2055,15 +2056,10 @@ async function getUserStreak(tx: Prisma.TransactionClient, userId: string): Prom
   const recent = await tx.gameAttempt.findMany({
     where: { userId },
     orderBy: { createdAt: 'desc' },
-    take: ECONOMY.MAX_STREAK + 1,
-    select: { score: true },
+    take: ECONOMY.MAX_STREAK * 10,
+    select: { score: true, createdAt: true },
   })
-  let streak = 0
-  for (const attempt of recent) {
-    if (attempt.score >= 60) streak++
-    else break
-  }
-  return Math.min(streak, ECONOMY.MAX_STREAK)
+  return computeStreak(recent)
 }
 
 // ---------------------------------------------------------------------------
