@@ -12,6 +12,7 @@ import { recordPlayer } from '@/lib/server/player-counts'
 import { dealRound, getOracle } from '@/lib/server/games/oracle'
 import '@/lib/server/games/register-oracles' // side-effect import to populate oracle registry
 import crypto from 'node:crypto'
+import { toApiResponse } from '@/lib/server/api-error'
 
 const schema = z.object({
   game: z.enum(['token_prophet', 'prompt_golf', 'bug_exorcist', 'context_chicken', 'rate_limit_roulette', 'benchmark_brawl', 'spot_deepfake', 'prompt_crash', 'token_mines']),
@@ -104,8 +105,7 @@ export async function POST(req: Request) {
       expiresAt: session.expiresAt?.toISOString() ?? null,
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    const code = message === 'Unauthorized' ? 401 : 400
-    return NextResponse.json({ error: message }, { status: code })
+    const { message, status } = toApiResponse(error)
+    return NextResponse.json({ error: message }, { status })
   }
 }

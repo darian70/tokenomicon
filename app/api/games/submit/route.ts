@@ -10,6 +10,7 @@ import {
   enrichPromptGolfSubmission,
   enrichBugExorcistSubmission,
 } from '@/lib/server/live-challenges'
+import { toApiResponse } from '@/lib/server/api-error'
 
 const schema = z.object({
   sessionId: z.string().min(1),
@@ -91,8 +92,7 @@ export async function POST(req: Request) {
       progression: progression ?? null,
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    const code = message === 'Unauthorized' ? 401 : 400
-    return NextResponse.json({ error: message }, { status: code })
+    const { message, status } = toApiResponse(error)
+    return NextResponse.json({ error: message }, { status })
   }
 }
