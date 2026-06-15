@@ -16,6 +16,10 @@ export interface GameCatalogEntry {
   accent: string
   accentBg: string
   accentBorder: string
+  // Chance games pay out non-cashable bonus_compute and require a disclosure.
+  // Skill games pay out arena_credits redeemable for future entry costs.
+  isChanceGame: boolean
+  payoutBucket: 'arena_credits' | 'bonus_compute'
 }
 
 export const GAME_CATALOG: GameCatalogEntry[] = [
@@ -33,6 +37,8 @@ export const GAME_CATALOG: GameCatalogEntry[] = [
     accent: '#5ad8ff',
     accentBg: 'rgba(90,216,255,0.06)',
     accentBorder: 'rgba(90,216,255,0.2)',
+    isChanceGame: false,
+    payoutBucket: 'arena_credits',
   },
   {
     id: 'prompt_golf',
@@ -48,6 +54,8 @@ export const GAME_CATALOG: GameCatalogEntry[] = [
     accent: '#59f5a9',
     accentBg: 'rgba(89,245,169,0.06)',
     accentBorder: 'rgba(89,245,169,0.2)',
+    isChanceGame: false,
+    payoutBucket: 'arena_credits',
   },
   {
     id: 'bug_exorcist',
@@ -63,6 +71,8 @@ export const GAME_CATALOG: GameCatalogEntry[] = [
     accent: '#ff4d6d',
     accentBg: 'rgba(255,77,109,0.06)',
     accentBorder: 'rgba(255,77,109,0.2)',
+    isChanceGame: false,
+    payoutBucket: 'arena_credits',
   },
   {
     id: 'context_chicken',
@@ -78,14 +88,16 @@ export const GAME_CATALOG: GameCatalogEntry[] = [
     accent: '#ffd700',
     accentBg: 'rgba(255,215,0,0.06)',
     accentBorder: 'rgba(255,215,0,0.2)',
+    isChanceGame: false,
+    payoutBucket: 'arena_credits',
   },
   {
     id: 'rate_limit_roulette',
     slug: 'rate-roulette',
     name: 'Rate Roulette',
     tagline: 'Latency Bet',
-    description: 'Which provider wins the latency race? Pick based on real hardware profiles — LPU vs GPU, model size, tier.',
-    longDescription: 'Three AI providers are given the same prompt. Pick the one that finishes first. The race is simulated using real-world latency profiles and seeded jitter — outcomes are provably fair and skill-based. Groq LPU vs Anthropic Sonnet vs OpenAI GPT-4o is never a coin flip if you know your hardware.',
+    description: 'Which provider wins the latency race? Pick based on real hardware specs — LPU vs GPU, model size, tier.',
+    longDescription: 'Three AI providers are fired at the same prompt in a live parallel race. Pick the one that responds first. Results are real network calls — Groq LPU vs Anthropic Sonnet vs OpenAI GPT-4o is never a coin flip if you know your hardware. Every race is seeded for provable fairness and logged for audit.',
     rewardRange: 'Up to 200 cr',
     maxReward: 200,
     difficulty: 'hard',
@@ -93,6 +105,8 @@ export const GAME_CATALOG: GameCatalogEntry[] = [
     accent: '#6e9bff',
     accentBg: 'rgba(110,155,255,0.06)',
     accentBorder: 'rgba(110,155,255,0.2)',
+    isChanceGame: false,
+    payoutBucket: 'arena_credits',
   },
   {
     id: 'benchmark_brawl',
@@ -100,7 +114,7 @@ export const GAME_CATALOG: GameCatalogEntry[] = [
     name: 'Benchmark Brawl',
     tagline: 'Model Arena',
     description: 'Pick the model that produces the best output. Know your models.',
-    longDescription: 'You are shown a coding or reasoning task and its evaluation criteria. Select which model — GPT-4, Claude, Gemini, or others — will produce the best output. Knowledge is your weapon.',
+    longDescription: 'You are shown a coding or reasoning task and its evaluation criteria. Select which model — GPT-4, Claude, Gemini, or others — will produce the best output. A judge model evaluates the real outputs live. Knowledge is your weapon.',
     rewardRange: 'Up to 200 cr',
     maxReward: 200,
     difficulty: 'hard',
@@ -108,6 +122,8 @@ export const GAME_CATALOG: GameCatalogEntry[] = [
     accent: '#ff6b35',
     accentBg: 'rgba(255,107,53,0.06)',
     accentBorder: 'rgba(255,107,53,0.2)',
+    isChanceGame: false,
+    payoutBucket: 'arena_credits',
   },
   {
     id: 'spot_deepfake',
@@ -123,6 +139,8 @@ export const GAME_CATALOG: GameCatalogEntry[] = [
     accent: '#e879f9',
     accentBg: 'rgba(232,121,249,0.06)',
     accentBorder: 'rgba(232,121,249,0.2)',
+    isChanceGame: false,
+    payoutBucket: 'arena_credits',
   },
   {
     id: 'prompt_crash',
@@ -130,7 +148,7 @@ export const GAME_CATALOG: GameCatalogEntry[] = [
     name: 'Prompt Crash',
     tagline: 'Cash-Out Multiplier',
     description: 'Ride the multiplier higher. Cash out before the prompt crashes.',
-    longDescription: 'A live multiplier starts at 1.00× and climbs. You can cash out at any moment to lock in your wager × multiplier. Wait too long and the prompt crashes — you lose your entry. Provably-fair crash point committed at round start; revealed when you cash out.',
+    longDescription: 'A live multiplier starts at 1.00× and climbs. You can cash out at any moment to lock in your wager × multiplier. Wait too long and the prompt crashes — you lose your entry. Provably-fair crash point committed at round start; revealed when you cash out. Pays out non-cashable bonus compute.',
     rewardRange: 'Up to 100× wager',
     maxReward: 1000,
     difficulty: 'hard',
@@ -138,6 +156,8 @@ export const GAME_CATALOG: GameCatalogEntry[] = [
     accent: '#fb923c',
     accentBg: 'rgba(251,146,60,0.06)',
     accentBorder: 'rgba(251,146,60,0.2)',
+    isChanceGame: true,
+    payoutBucket: 'bonus_compute',
   },
   {
     id: 'token_mines',
@@ -145,7 +165,7 @@ export const GAME_CATALOG: GameCatalogEntry[] = [
     name: 'Token Mines',
     tagline: 'Pick Safe Tokens',
     description: 'Reveal safe tokens to climb the multiplier. Hit a mine and lose it all.',
-    longDescription: 'A 5×5 grid hides mines among safe tokens. Each safe reveal compounds your multiplier. Cash out anytime — or keep digging for higher rewards. More mines = bigger payouts per pick, but higher risk. Provably-fair: mine positions hash-committed at round start, revealed on settle.',
+    longDescription: 'A 5×5 grid hides mines among safe tokens. Each safe reveal compounds your multiplier. Cash out anytime — or keep digging for higher rewards. More mines = bigger payouts per pick, but higher risk. Provably-fair: mine positions hash-committed at round start, revealed on settle. Pays out non-cashable bonus compute.',
     rewardRange: 'Up to 50× wager',
     maxReward: 1000,
     difficulty: 'hard',
@@ -153,6 +173,8 @@ export const GAME_CATALOG: GameCatalogEntry[] = [
     accent: '#5eead4',
     accentBg: 'rgba(94,234,212,0.06)',
     accentBorder: 'rgba(94,234,212,0.2)',
+    isChanceGame: true,
+    payoutBucket: 'bonus_compute',
   },
 ]
 
