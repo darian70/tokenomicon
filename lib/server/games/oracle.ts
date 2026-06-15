@@ -211,14 +211,34 @@ export async function dealRound<TChallenge, TTruth>(
 
 const TIERS: DifficultyTier[] = ['sandbox', 'production', 'blackbox']
 
+// Stable 32-bit integer derived from a game name string, used as a Postgres
+// advisory lock key. djb2 hash — fast, collision-free for our small game set.
+function gameLockId(game: GameType): bigint {
+  let h = 5381
+  for (let i = 0; i < game.length; i++) h = (Math.imul(h, 33) ^ game.charCodeAt(i)) >>> 0
+  return BigInt(h)
+}
+
 export async function refillPool(game: GameType): Promise<{ added: number; cost: number }> {
   const spec = REGISTRY.get(game)
   if (!spec) throw new Error(`No oracle registered for game ${game}`)
-  const target = spec.poolTargetPerTier ?? 5
 
+  // Acquire a session-level advisory lock so concurrent cron firings skip rather
+  // than each independently firing the same set of expensive model calls.
+  const lockId = gameLockId(game)
+  const [lockRow] = await db.$queryRaw<[{ acquired: boolean }]>`
+    SELECT pg_try_advisory_lock(${lockId}::bigint) AS acquired
+  `
+  if (!lockRow.acquired) {
+    // Another invocation is already refilling this game — skip.
+    return { added: 0, cost: 0 }
+  }
+
+  const target = spec.poolTargetPerTier ?? 5
   let added = 0
   let totalCost = 0
 
+  try {
   for (const tier of TIERS) {
     const ready = await db.oraclePoolEntry.count({
       where: { game, tier, servedAt: null, reservedAt: null },
@@ -284,6 +304,9 @@ export async function refillPool(game: GameType): Promise<{ added: number; cost:
   }
 
   return { added, cost: totalCost }
+  } finally {
+    await db.$executeRaw`SELECT pg_advisory_unlock(${lockId}::bigint)`
+  }
 }
 
 async function reservePoolEntry(game: GameType, tier: DifficultyTier) {
