@@ -2135,7 +2135,7 @@ export async function createGameSession(userId: string, game: GameType, tier: Di
         expiresAt,
       },
     })
-  })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
 }
 
 export async function submitGameSession(input: {
