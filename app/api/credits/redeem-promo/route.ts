@@ -60,7 +60,9 @@ export async function POST(req: Request) {
     ) {
       return NextResponse.json({ error: 'You have already redeemed this code.' }, { status: 409 })
     }
+    const detail = error instanceof Error ? `${error.constructor.name}: ${error.message}` : String(error)
+    console.error('[redeem-promo]', detail)
     const { message, status } = toApiResponse(error)
-    return NextResponse.json({ error: message }, { status })
+    return NextResponse.json({ error: detail }, { status })
   }
 }
