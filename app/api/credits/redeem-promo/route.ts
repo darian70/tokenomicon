@@ -3,12 +3,18 @@ import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 import { requireUserProfile } from '@/lib/server/auth'
 import { db } from '@/lib/server/db'
-import { addLedgerEntry } from '@/lib/server/ledger'
 import { ApiError, toApiResponse } from '@/lib/server/api-error'
 
 const schema = z.object({
   code: z.string().min(1).max(64),
 })
+
+// Bucket → CreditBalance column name
+const BUCKET_COL: Record<string, 'purchasedCompute' | 'arenaCredits' | 'bonusCompute'> = {
+  purchased_compute: 'purchasedCompute',
+  arena_credits: 'arenaCredits',
+  bonus_compute: 'bonusCompute',
+}
 
 export async function POST(req: Request) {
   try {
@@ -24,27 +30,33 @@ export async function POST(req: Request) {
       throw new ApiError('This promo code has reached its redemption limit.', 410)
     }
 
-    // Atomic: create redemption record + ledger entry + increment counter
-    await db.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Unique constraint (codeId, userId) prevents double-redemption
-      await tx.promoCodeRedemption.create({
+    const col = BUCKET_COL[promo.bucket] ?? 'bonusCompute'
+
+    // Batch transaction — compatible with pgBouncer transaction mode.
+    // Unique constraint on PromoCodeRedemption(codeId, userId) prevents double-redemption.
+    await db.$transaction([
+      db.promoCodeRedemption.create({
         data: { codeId: promo.id, userId: profile.id },
-      })
-
-      await addLedgerEntry({
-        tx,
-        userId: profile.id,
-        bucket: promo.bucket,
-        type: 'promo_code_redemption',
-        amount: promo.creditAmount,
-        metadata: { promoCodeId: promo.id, code: promo.code },
-      })
-
-      await tx.promoCode.update({
+      }),
+      db.creditLedgerEntry.create({
+        data: {
+          userId: profile.id,
+          bucket: promo.bucket,
+          type: 'promo_code_redemption',
+          amount: promo.creditAmount,
+          metadata: { promoCodeId: promo.id, code: promo.code },
+        },
+      }),
+      db.creditBalance.upsert({
+        where: { userId: profile.id },
+        create: { userId: profile.id, [col]: promo.creditAmount },
+        update: { [col]: { increment: promo.creditAmount } },
+      }),
+      db.promoCode.update({
         where: { id: promo.id },
         data: { totalRedeemed: { increment: 1 } },
-      })
-    })
+      }),
+    ])
 
     return NextResponse.json({
       success: true,
