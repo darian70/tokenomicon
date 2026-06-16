@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { GAME_CATALOG, type GameCatalogEntry } from '@/lib/game-catalog'
 import HotGameBadge from '@/components/fx/HotGameBadge'
@@ -18,6 +18,14 @@ const DIFFICULTY_COLORS = {
 }
 
 export default function GamesPage() {
+  return (
+    <Suspense>
+      <GamesPageInner />
+    </Suspense>
+  )
+}
+
+function GamesPageInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [category, setCategory] = useState<FilterCategory>('all')
