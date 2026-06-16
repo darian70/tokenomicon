@@ -81,6 +81,11 @@ export default function WalletPage() {
   const [pendingRevoke, setPendingRevoke] = useState<string | null>(null)
   const [checkoutBanner, setCheckoutBanner] = useState<'success' | 'cancelled' | null>(null)
 
+  // Promo code state
+  const [promoCode, setPromoCode] = useState('')
+  const [promoLoading, setPromoLoading] = useState(false)
+  const [promoBanner, setPromoBanner] = useState<{ credits: number; description: string } | null>(null)
+
   // Auto-topup state
   const [autoTopup, setAutoTopup] = useState<AutoTopupConfig | null>(null)
   const [autoTopupLoading, setAutoTopupLoading] = useState(true)
@@ -216,6 +221,28 @@ export default function WalletPage() {
       toast.error(e instanceof Error ? e.message : 'Failed to update')
     } finally {
       setTopupUpdating(false)
+    }
+  }
+
+  async function handleRedeemPromo(e: React.FormEvent) {
+    e.preventDefault()
+    if (!promoCode.trim()) return
+    setPromoLoading(true)
+    try {
+      const res = await fetch('/api/credits/redeem-promo', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ code: promoCode.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Redemption failed')
+      setPromoBanner({ credits: data.credits, description: data.description })
+      setPromoCode('')
+      toast.success(`+${data.credits.toLocaleString()} credits added!`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Invalid promo code')
+    } finally {
+      setPromoLoading(false)
     }
   }
 
@@ -902,6 +929,45 @@ export default function WalletPage() {
                 <p className="text-[10px] text-[#3a4a5a] font-mono">
                   Base URL: <code className="text-[#5ad8ff]">https://tokenomicon.io/api/v1</code>
                 </p>
+              </div>
+            </div>
+
+            {/* Promo Code */}
+            <div className="rounded-xl border border-[#192433] bg-[#0c111a] overflow-hidden">
+              <div className="px-4 py-3 border-b border-[#192433]">
+                <p className="text-xs font-display tracking-widest text-white">PROMO CODE</p>
+                <p className="text-[10px] text-[#4a5a6d] mt-0.5">Redeem a code for free credits</p>
+              </div>
+              <div className="px-4 py-4 space-y-3">
+                {promoBanner && (
+                  <div className="rounded-lg border border-[#59f5a9]/30 bg-[#59f5a9]/5 px-3 py-2.5 flex items-start gap-2">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#59f5a9" strokeWidth="2.5" className="flex-shrink-0 mt-0.5"><path d="M20 6 9 17l-5-5"/></svg>
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-display tracking-wider text-[#59f5a9]">+{promoBanner.credits.toLocaleString()} CREDITS ADDED</p>
+                      <p className="text-[9px] text-[#3a5a3a] mt-0.5">{promoBanner.description}</p>
+                    </div>
+                    <button onClick={() => setPromoBanner(null)} className="flex-shrink-0 text-[#3a5a3a] hover:text-[#59f5a9]">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                    </button>
+                  </div>
+                )}
+                <form onSubmit={handleRedeemPromo} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                    placeholder="ENTER CODE"
+                    maxLength={64}
+                    className="flex-1 bg-[#0a1520] border border-[#1a2535] rounded-lg px-3 py-2 text-xs font-mono text-white placeholder:text-[#3a4a5a] uppercase tracking-widest focus:border-[#5ad8ff]/40 focus:outline-none transition-colors"
+                  />
+                  <button
+                    type="submit"
+                    disabled={promoLoading || !promoCode.trim()}
+                    className="flex-shrink-0 px-3 py-2 text-[10px] font-display tracking-widest rounded-lg bg-[#5ad8ff] text-[#070a10] font-bold hover:bg-[#4ac8ef] transition-all disabled:opacity-40"
+                  >
+                    {promoLoading ? '…' : 'APPLY'}
+                  </button>
+                </form>
               </div>
             </div>
 

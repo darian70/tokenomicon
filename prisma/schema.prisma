@@ -26,6 +26,7 @@ enum LedgerEntryType {
   signup_bonus
   platform_rake
   referral_bonus
+  promo_code_redemption
 }
 
 enum GameType {
@@ -72,6 +73,7 @@ model UserProfile {
   referralCode     ReferralCode?
   referralsGiven   ReferralRedemption[] @relation("ReferralGiver")
   referralUsed     ReferralRedemption?  @relation("ReferralRecipient")
+  promoRedemptions PromoCodeRedemption[]
 }
 
 model Achievement {
@@ -546,4 +548,37 @@ model SemanticCacheEntry {
   @@unique([model, promptHash])  // exact-match fast path
   @@index([model, expiresAt])    // for active entry scans
   @@index([createdAt])
+}
+
+// ============================================================================
+// Promo Codes — admin-created codes that grant free credits for testing
+// ============================================================================
+
+model PromoCode {
+  id             String               @id @default(cuid())
+  code           String               @unique  // stored uppercase, e.g. "LAUNCH50"
+  description    String               // shown to user after redemption
+  creditAmount   Int                  // credits granted per redemption
+  bucket         CreditBucket         @default(bonus_compute)
+  maxRedemptions Int?                 // null = unlimited
+  totalRedeemed  Int                  @default(0)
+  expiresAt      DateTime?            // null = never expires
+  createdByAdmin String               // admin UserProfile.id
+  createdAt      DateTime             @default(now())
+  redemptions    PromoCodeRedemption[]
+
+  @@index([code])
+}
+
+model PromoCodeRedemption {
+  id        String      @id @default(cuid())
+  codeId    String
+  userId    String
+  createdAt DateTime    @default(now())
+  code      PromoCode   @relation(fields: [codeId], references: [id])
+  user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([codeId, userId])
+  @@index([userId])
+  @@index([codeId])
 }
