@@ -235,12 +235,20 @@ export default function WalletPage() {
         body: JSON.stringify({ code: promoCode.trim() }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Redemption failed')
+      if (!res.ok) {
+        const err = new Error(data.error ?? 'Redemption failed')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(err as any)._debug = data._debug
+        throw err
+      }
       setPromoBanner({ credits: data.credits, description: data.description })
       setPromoCode('')
       toast.success(`+${data.credits.toLocaleString()} credits added!`)
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Invalid promo code')
+      const msg = e instanceof Error ? e.message : 'Invalid promo code'
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const debug = (e as any)?._debug
+      toast.error(debug ? `${msg} | ${debug}` : msg)
     } finally {
       setPromoLoading(false)
     }
