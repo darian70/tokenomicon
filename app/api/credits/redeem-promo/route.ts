@@ -60,7 +60,10 @@ export async function POST(req: Request) {
     ) {
       return NextResponse.json({ error: 'You have already redeemed this code.' }, { status: 409 })
     }
+    // DEBUG: surface raw error so we can diagnose — remove after fix
+    const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+    console.error('[redeem-promo]', detail)
     const { message, status } = toApiResponse(error)
-    return NextResponse.json({ error: message }, { status })
+    return NextResponse.json({ error: message, _debug: detail }, { status })
   }
 }
